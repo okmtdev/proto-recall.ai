@@ -1,0 +1,21 @@
+# Node
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# Terraform（.terraform.lock.hcl はコミットする）
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.auto.tfvars.example
+crash.log
+
+# misc
+.DS_Store
