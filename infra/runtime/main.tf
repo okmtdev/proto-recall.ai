@@ -36,7 +36,8 @@ resource "google_project_iam_member" "cloudsql_client" {
 
 # ── シークレットへのアクセス権 ─────────────────────────────────
 locals {
-  web_secrets     = ["database-url", "auth-secret", "google-oauth-client-id", "google-oauth-client-secret", "recall-api-key", "gateway-signing-secret"]
+  # gemini-api-key は議事録の自動生成（バッチ）で web も使う
+  web_secrets     = ["database-url", "auth-secret", "google-oauth-client-id", "google-oauth-client-secret", "recall-api-key", "gateway-signing-secret", "gemini-api-key"]
   gateway_secrets = concat(["database-url", "gemini-api-key", "recall-api-key", "gateway-signing-secret"], var.enable_openai ? ["openai-api-key"] : [])
 }
 
@@ -206,6 +207,7 @@ resource "google_cloud_run_v2_service" "web" {
           AUTH_GOOGLE_SECRET     = "google-oauth-client-secret"
           RECALL_API_KEY         = "recall-api-key"
           GATEWAY_SIGNING_SECRET = "gateway-signing-secret"
+          GEMINI_API_KEY         = "gemini-api-key"
         }
         content {
           name = env.key

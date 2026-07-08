@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { updateMeetingStatusByBot } from "@/lib/db";
+import { getMeetingIdByBot, updateMeetingStatusByBot } from "@/lib/db";
+import { generateAndStoreMinutes } from "@/lib/minutes";
 
 /**
  * Recall.ai の bot status change Webhook 受信。
  * ダッシュボード（Recall 側）でこの URL を登録する: <web_url>/api/webhooks/recall
+ * 会議終了（done）を検知したら議事録を自動生成する。
  * TODO(M2): Svix 署名検証を入れる（https://docs.recall.ai/docs/bot-status-change-events）
  */
 export async function POST(req: Request): Promise<NextResponse> {
@@ -24,6 +26,18 @@ export async function POST(req: Request): Promise<NextResponse> {
             ? "failed"
             : null;
       if (status) await updateMeetingStatusByBot(botId, status);
+
+      // 会議が終わったら議事録を自動生成（失敗しても Webhook 自体は成功扱い）
+      if (status === "done") {
+        const meetingId = await getMeetingIdByBot(botId);
+        if (meetingId) {
+          try {
+            await generateAndStoreMinutes(meetingId);
+          } catch (err) {
+            console.error(`[webhook] minutes generation failed meeting=${meetingId}`, err);
+          }
+        }
+      }
     }
   } catch (err) {
     console.error("[webhook] parse failed", err);

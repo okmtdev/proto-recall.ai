@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
+import { estimateCostUsd } from "@/lib/cost";
 import { getOrCreateAgent, listMeetings } from "@/lib/db";
 import { inviteBotAction, saveAgentAction } from "./actions";
 
@@ -30,6 +31,11 @@ export default async function Dashboard() {
 
   const agent = await getOrCreateAgent(userId);
   const meetings = await listMeetings(userId);
+
+  const now = new Date();
+  const monthlyCost = meetings
+    .filter((m) => m.created_at.getFullYear() === now.getFullYear() && m.created_at.getMonth() === now.getMonth())
+    .reduce((sum, m) => sum + (estimateCostUsd(m.started_at, m.ended_at) ?? 0), 0);
 
   return (
     <main>
@@ -90,19 +96,29 @@ export default async function Dashboard() {
       </section>
 
       <section style={card}>
-        <h2 style={{ marginTop: 0, fontSize: 17 }}>会議履歴</h2>
+        <h2 style={{ marginTop: 0, fontSize: 17 }}>
+          会議履歴
+          <span style={{ marginLeft: 12, fontSize: 13, fontWeight: "normal", color: "#667" }}>
+            今月の概算コスト: ${monthlyCost.toFixed(2)}
+          </span>
+        </h2>
         {meetings.length === 0 && <p style={{ color: "#667" }}>まだありません</p>}
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {meetings.map((m) => (
-            <li key={m.id} style={{ padding: "10px 0", borderBottom: "1px solid #eef" }}>
-              <Link href={`/dashboard/meetings/${m.id}`} style={{ color: "#3b5bdb", textDecoration: "none" }}>
-                {m.meeting_url}
-              </Link>
-              <span style={{ marginLeft: 8, fontSize: 12, color: "#667" }}>
-                [{m.status}] {new Date(m.created_at).toLocaleString("ja-JP")}
-              </span>
-            </li>
-          ))}
+          {meetings.map((m) => {
+            const cost = estimateCostUsd(m.started_at, m.ended_at);
+            return (
+              <li key={m.id} style={{ padding: "10px 0", borderBottom: "1px solid #eef" }}>
+                <Link href={`/dashboard/meetings/${m.id}`} style={{ color: "#3b5bdb", textDecoration: "none" }}>
+                  {m.meeting_url}
+                </Link>
+                <span style={{ marginLeft: 8, fontSize: 12, color: "#667" }}>
+                  [{m.status}] {new Date(m.created_at).toLocaleString("ja-JP")}
+                  {cost !== null ? ` · 約 $${cost.toFixed(2)}` : ""}
+                  {m.minutes ? " · 📝議事録あり" : ""}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       </section>
     </main>

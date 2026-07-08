@@ -12,6 +12,24 @@ const fallbackProfile: AgentProfile = {
   engine: "gemini",
 };
 
+/** 文字起こしを永続化する（会議終了後の議事録生成に使う）。DB 未設定時は何もしない */
+export async function persistTranscriptSegment(
+  meetingId: string,
+  speaker: string,
+  text: string,
+  tsMs: number,
+): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `insert into transcript_segments (meeting_id, speaker, text, ts_ms) values ($1, $2, $3, $4)`,
+      [meetingId, speaker, text, tsMs],
+    );
+  } catch (err) {
+    console.error(`[db] transcript insert failed meeting=${meetingId}`, err);
+  }
+}
+
 /** meetings.id からエージェント設定を引く。DB 未設定（ローカル検証）時は既定プロファイル */
 export async function getAgentForMeeting(meetingId: string): Promise<AgentProfile> {
   if (!pool) return fallbackProfile;

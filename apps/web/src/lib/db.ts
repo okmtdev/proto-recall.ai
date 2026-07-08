@@ -60,12 +60,28 @@ export async function updateAgent(
   );
 }
 
+export interface MinutesData {
+  summary?: string;
+  decisions?: string[];
+  actionItems?: { task?: string; owner?: string; due?: string }[];
+  generatedAt?: string;
+}
+
 export interface MeetingRow {
   id: string;
   meeting_url: string;
   recall_bot_id: string | null;
   status: string;
+  started_at: Date | null;
+  ended_at: Date | null;
+  minutes: MinutesData | null;
   created_at: Date;
+}
+
+export interface TranscriptRow {
+  speaker: string | null;
+  text: string;
+  ts_ms: string; // bigint は pg では文字列で返る
 }
 
 export async function createMeeting(
@@ -86,7 +102,7 @@ export async function setMeetingBot(meetingId: string, botId: string): Promise<v
 
 export async function listMeetings(userId: string): Promise<MeetingRow[]> {
   const { rows } = await pool.query<MeetingRow>(
-    `select id, meeting_url, recall_bot_id, status, created_at
+    `select id, meeting_url, recall_bot_id, status, started_at, ended_at, minutes, created_at
        from meetings where user_id = $1 order by created_at desc limit 50`,
     [userId],
   );
@@ -95,11 +111,35 @@ export async function listMeetings(userId: string): Promise<MeetingRow[]> {
 
 export async function getMeeting(userId: string, meetingId: string): Promise<MeetingRow | null> {
   const { rows } = await pool.query<MeetingRow>(
-    `select id, meeting_url, recall_bot_id, status, created_at
+    `select id, meeting_url, recall_bot_id, status, started_at, ended_at, minutes, created_at
        from meetings where user_id = $1 and id = $2`,
     [userId, meetingId],
   );
   return rows[0] ?? null;
+}
+
+export async function getMeetingIdByBot(botId: string): Promise<string | null> {
+  const { rows } = await pool.query<{ id: string }>(
+    `select id from meetings where recall_bot_id = $1`,
+    [botId],
+  );
+  return rows[0]?.id ?? null;
+}
+
+export async function getTranscript(meetingId: string): Promise<TranscriptRow[]> {
+  const { rows } = await pool.query<TranscriptRow>(
+    `select speaker, text, ts_ms from transcript_segments
+      where meeting_id = $1 order by ts_ms, id limit 5000`,
+    [meetingId],
+  );
+  return rows;
+}
+
+export async function setMeetingMinutes(meetingId: string, minutes: MinutesData): Promise<void> {
+  await pool.query(`update meetings set minutes = $2 where id = $1`, [
+    meetingId,
+    JSON.stringify(minutes),
+  ]);
 }
 
 export async function updateMeetingStatusByBot(botId: string, status: string): Promise<void> {

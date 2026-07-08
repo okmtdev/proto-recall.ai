@@ -16,6 +16,8 @@ Google Meet ─ Recall.ai ボット ──会議音声──▶ gateway (Cloud R
 
 - Web で Google ログイン → エージェント設定 → Meet の URL を貼ってボット召喚
 - エージェントは**名前で呼びかけられたときだけ**応答（ウェイクワード方式）
+- **会議が終わると議事録（要約・決定事項・アクションアイテム）が自動生成**される（Gemini バッチ、1会議数円）
+- 会議ごとの**概算コストと今月の合計**をダッシュボードに表示
 - Cloud Run の60分 WebSocket 上限は Recall.ai の自動再接続（3秒×最大30回）で吸収
 
 ## リポジトリ構成
@@ -44,7 +46,7 @@ Google Meet ─ Recall.ai ボット ──会議音声──▶ gateway (Cloud R
 - [ ] Recall.ai の bot 作成ペイロード・音声イベント形式の実打ち確認（`apps/web/src/lib/recall.ts` / `apps/gateway/src/recall.ts` の TODO）
 - [ ] Gemini Live のモデル名確認（`GEMINI_LIVE_MODEL` で差し替え可）
 - [ ] Output Media がアカウントで有効か確認（無効なら Recall.ai サポートへ）
-- [ ] transcript の DB 永続化 / Webhook の Svix 署名検証 / OpenAI Realtime adapter
+- [ ] Webhook の Svix 署名検証 / OpenAI Realtime adapter / 入室時アナウンス
 
 ## コスト目安
 

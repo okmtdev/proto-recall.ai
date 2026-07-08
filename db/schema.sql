@@ -33,6 +33,8 @@ create table if not exists meetings (
                 check (status in ('joining', 'in_call', 'done', 'failed')),
   started_at    timestamptz,
   ended_at      timestamptz,
+  -- 会議終了時に自動生成される議事録 { summary, decisions[], actionItems[], generatedAt }
+  minutes       jsonb,
   created_at    timestamptz not null default now()
 );
 

@@ -114,8 +114,8 @@ sequenceDiagram
 |---|---|---|
 | users | id, google_sub (uniq), email, name | Auth.js の Google プロファイルから upsert |
 | agents | id, user_id, name, system_prompt, language, engine, voice, wake_word | ユーザーごとに複数可 |
-| meetings | id, user_id, agent_id, meeting_url, recall_bot_id, status, started_at, ended_at | status: joining / in_call / done / failed |
-| transcript_segments | id, meeting_id, speaker, text, ts_ms | ライブ配信と同時に永続化 |
+| meetings | id, user_id, agent_id, meeting_url, recall_bot_id, status, started_at, ended_at, minutes(jsonb) | status: joining / in_call / done / failed。minutes は自動生成の議事録 |
+| transcript_segments | id, meeting_id, speaker, text, ts_ms | gateway が文単位にバッファして永続化 |
 
 ## 6. API（web の Route Handlers）
 
@@ -124,8 +124,19 @@ sequenceDiagram
 | `POST /api/bots` | Recall.ai へ bot 作成、meetings 行作成 |
 | `DELETE /api/bots/:id` | bot を退出させる |
 | `GET /api/meetings` / `GET /api/meetings/:id` | 一覧・詳細（文字起こし含む） |
-| `POST /api/webhooks/recall` | Recall.ai の bot status change Webhook 受信 |
+| `POST /api/webhooks/recall` | Recall.ai の bot status change Webhook 受信。会議終了（done）で議事録を自動生成 |
 | `GET/PUT /api/agents` | エージェント設定 CRUD |
+
+一覧・設定・召喚・議事録再生成は Next.js の Server Actions（`app/dashboard/actions.ts`）としても実装している。
+
+### 6.1 議事録の自動生成
+
+- 会議終了 Webhook（または画面の「議事録を生成」ボタン）で、保存済み `transcript_segments` を
+  Gemini（`GEMINI_TEXT_MODEL`、既定 `gemini-2.5-flash`）に渡して
+  `{ summary, decisions[], actionItems[] }` の JSON を生成し `meetings.minutes` に保存する。
+- リアルタイム性が不要なバッチ処理なので、コストは1会議あたり数円レベル。
+- 会議ページでは議事録 → 文字起こし全文の順に表示。ダッシュボードの履歴には
+  会議ごとの概算コスト（$1.35/h 換算）と今月の合計を表示する。
 
 gateway 側 WebSocket:
 
@@ -168,5 +179,5 @@ gateway 側 WebSocket:
 
 1. **M1（動く骨格）**: bot 召喚 → 音声往復 → ダッシュボードに文字起こし
 2. **M2（体験）**: ウェイクワード精度、入室アナウンス、ライブビュー介入操作
-3. **M3（記録）**: 会議後アーカイブ、要約・アクションアイテム（通常の Gemini API でバッチ処理）
+3. **M3（記録）**: ~~会議後アーカイブ、要約・アクションアイテム~~ → **実装済み**（文字起こし永続化 + 会議終了時の議事録自動生成 + コスト概算表示。§6.1）
 4. **M4（運用）**: GitHub Actions + Workload Identity Federation で CI/CD、カスタムドメイン + LB、カレンダー自動参加

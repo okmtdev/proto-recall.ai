@@ -1,8 +1,40 @@
 import type { WebSocket } from "ws";
 import { config } from "./config.js";
+import { persistTranscriptSegment } from "./db.js";
 import { GeminiLiveEngine } from "./engines/gemini.js";
 import { OpenAIRealtimeEngine } from "./engines/openai.js";
 import type { VoiceEngine } from "./engines/types.js";
+
+/**
+ * エンジンから届く文字起こしは細切れのフラグメントなので、
+ * 文末（句点等）か一定量・一定時間でまとめて1レコードとして保存する。
+ */
+class TranscriptBuffer {
+  private text = "";
+  private firstTsMs = 0;
+  private timer: NodeJS.Timeout | null = null;
+
+  constructor(private flushFn: (text: string, tsMs: number) => void) {}
+
+  append(fragment: string, tsMs: number): void {
+    if (this.text === "") this.firstTsMs = tsMs;
+    this.text += fragment;
+    if (this.timer) clearTimeout(this.timer);
+    if (/[。．！？!?]\s*$/.test(this.text) || this.text.length > 200) {
+      this.flush();
+    } else {
+      this.timer = setTimeout(() => this.flush(), 4000);
+    }
+  }
+
+  flush(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    const t = this.text.trim();
+    this.text = "";
+    if (t) this.flushFn(t, this.firstTsMs);
+  }
+}
 
 export interface AgentProfile {
   name: string;
@@ -30,6 +62,7 @@ export class MeetingSession {
   private engine: VoiceEngine | null = null;
   private outputSockets = new Set<WebSocket>();
   private dashboardSockets = new Set<WebSocket>();
+  private transcriptBuffers = new Map<string, TranscriptBuffer>();
   private startedAt = Date.now();
   private disposeTimer: NodeJS.Timeout | null = null;
 
@@ -62,6 +95,7 @@ export class MeetingSession {
         },
         onInputTranscript: (text) => {
           this.broadcastEvent({ type: "transcript", speaker: "meeting", text, tsMs: this.elapsedMs() });
+          this.bufferTranscript("meeting", text);
           if (text.includes(this.agent.wakeWord)) {
             this.responseWindowOpen = true;
             this.broadcastEvent({ type: "agent_state", state: "thinking", tsMs: this.elapsedMs() });
@@ -69,6 +103,7 @@ export class MeetingSession {
         },
         onOutputTranscript: (text) => {
           this.broadcastEvent({ type: "transcript", speaker: this.agent.name, text, tsMs: this.elapsedMs() });
+          this.bufferTranscript(this.agent.name, text);
         },
         onTurnComplete: () => {
           this.responseWindowOpen = false;
@@ -118,8 +153,20 @@ export class MeetingSession {
     this.disposeTimer = null;
   }
 
+  private bufferTranscript(speaker: string, fragment: string): void {
+    let buf = this.transcriptBuffers.get(speaker);
+    if (!buf) {
+      buf = new TranscriptBuffer((text, tsMs) => {
+        void persistTranscriptSegment(this.meetingId, speaker, text, tsMs);
+      });
+      this.transcriptBuffers.set(speaker, buf);
+    }
+    buf.append(fragment, this.elapsedMs());
+  }
+
   async dispose(): Promise<void> {
     this.cancelDispose();
+    for (const buf of this.transcriptBuffers.values()) buf.flush();
     await this.engine?.close();
     this.engine = null;
     sessions.delete(this.meetingId);
@@ -137,7 +184,6 @@ export class MeetingSession {
   private broadcastEvent(event: DashboardEvent): void {
     const json = JSON.stringify(event);
     for (const ws of this.dashboardSockets) if (ws.readyState === ws.OPEN) ws.send(json);
-    // TODO(M1): transcript_segments テーブルへの永続化（pg 接続は lib 化して web と共有スキーマ）
   }
 }
 

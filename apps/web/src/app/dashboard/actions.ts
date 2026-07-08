@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { createMeeting, getOrCreateAgent, setMeetingBot, updateAgent } from "@/lib/db";
+import { createMeeting, getMeeting, getOrCreateAgent, setMeetingBot, updateAgent } from "@/lib/db";
+import { generateAndStoreMinutes } from "@/lib/minutes";
 import { createRecallBot } from "@/lib/recall";
 
 async function requireUserId(): Promise<string> {
@@ -34,5 +35,15 @@ export async function inviteBotAction(formData: FormData): Promise<void> {
   const { botId } = await createRecallBot({ meetingId, meetingUrl, botName: agent.name });
   await setMeetingBot(meetingId, botId);
 
+  redirect(`/dashboard/meetings/${meetingId}`);
+}
+
+/** 議事録の手動（再）生成。Webhook を取りこぼした場合や会議途中でも使える */
+export async function generateMinutesAction(formData: FormData): Promise<void> {
+  const userId = await requireUserId();
+  const meetingId = String(formData.get("meetingId") ?? "");
+  const meeting = await getMeeting(userId, meetingId);
+  if (!meeting) redirect("/dashboard");
+  await generateAndStoreMinutes(meetingId);
   redirect(`/dashboard/meetings/${meetingId}`);
 }
