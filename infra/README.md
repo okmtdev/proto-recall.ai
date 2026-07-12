@@ -23,7 +23,7 @@ export INSTANCE=<existing-cloudsql-instance-name>
 gcloud storage buckets create gs://$STATE_BUCKET --project=$PROJECT --location=asia-northeast1 --uniform-bucket-level-access
 ```
 
-- (2) **Google OAuth クライアント**（Terraform 非対応）: [GCP コンソール > APIs & Services > Credentials](https://console.cloud.google.com/apis/credentials) で「OAuth クライアント ID（ウェブアプリケーション）」を作成。リダイレクト URI は runtime apply 後に判明する web の URL + `/api/auth/callback/google` を登録。
+- (2) **Google OAuth クライアント**（Terraform 非対応）: 同意画面の設定からトラブルシューティングまで **[docs/setup-google-login.md](../docs/setup-google-login.md)** に手順あり。要点: OAuth 同意画面を設定（External ならテストユーザー登録を忘れずに）→ Web アプリケーションのクライアントを作成 → リダイレクト URI に `http://localhost:3000/api/auth/callback/google` と、runtime apply 後に判明する `<web_url>/api/auth/callback/google` を登録。
 - (3) **API キーの取得**: Recall.ai（ap-northeast-1 のダッシュボード）、Google AI Studio（Gemini）、必要なら OpenAI。
 
 ## 1. persistent を apply

@@ -3,7 +3,7 @@
 Google Meet に**リアルタイムで音声会話できる AI エージェント**を送り込む個人向け Web サービスのプロトタイプ。
 [Recall.ai](https://www.recall.ai)（Meeting Bot + Output Media）× Gemini Live API × GCP（Cloud Run ゼロスケール）で、**待機中のインフラコストほぼ ¥0** を狙う構成。
 
-📄 詳細仕様: [docs/spec.md](docs/spec.md) / インフラ手順: [infra/README.md](infra/README.md)
+📄 詳細仕様: [docs/spec.md](docs/spec.md) / インフラ手順: [infra/README.md](infra/README.md) / Google ログイン設定: [docs/setup-google-login.md](docs/setup-google-login.md)
 
 ## 仕組み
 
