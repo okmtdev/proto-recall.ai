@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<!--
+  Recall.ai ボットの Chromium が開くページ。
+  このページの「音」がそのままボットの声として会議に流れる。
+  gateway の /ws/output から PCM16(24kHz) のバイナリフレームを受け取り AudioWorklet で再生する。
+-->
+<head>
+  <meta charset="utf-8" />
+  <title>proto-recall agent</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0b1020; color: #e6ebff;
+                 font-family: system-ui, sans-serif; display: grid; place-items: center; }
+    .badge { text-align: center; }
+    .dot { width: 18px; height: 18px; border-radius: 50%; background: #4ade80;
+           margin: 0 auto 12px; transition: transform .15s; }
+    .speaking .dot { background: #60a5fa; transform: scale(1.6); }
+  </style>
+</head>
+<body>
+  <div class="badge" id="badge">
+    <div class="dot"></div>
+    <div id="label">AI アシスタント参加中（録音・文字起こしが有効です）</div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const meeting = params.get("meeting");
+    const token = params.get("token");
+    const SAMPLE_RATE = 24000;
+
+    const workletCode = `
+      class PcmPlayer extends AudioWorkletProcessor {
+        constructor() { super(); this.queue = []; this.offset = 0;
+          this.port.onmessage = (e) => this.queue.push(new Float32Array(e.data)); }
+        process(_inputs, outputs) {
+          const out = outputs[0][0];
+          let i = 0;
+          while (i < out.length) {
+            const head = this.queue[0];
+            if (!head) { out.fill(0, i); this.port.postMessage({ playing: false }); break; }
+            const n = Math.min(out.length - i, head.length - this.offset);
+            out.set(head.subarray(this.offset, this.offset + n), i);
+            i += n; this.offset += n;
+            if (this.offset >= head.length) { this.queue.shift(); this.offset = 0; }
+            this.port.postMessage({ playing: true });
+          }
+          return true;
+        }
+      }
+      registerProcessor("pcm-player", PcmPlayer);
+    `;
+
+    async function start() {
+      const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
+      await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([workletCode], { type: "text/javascript" })));
+      const node = new AudioWorkletNode(ctx, "pcm-player");
+      node.connect(ctx.destination);
+      node.port.onmessage = (e) => document.getElementById("badge").classList.toggle("speaking", e.data.playing);
+      await ctx.resume();
+
+      function connect() {
+        const ws = new WebSocket(`wss://${location.host}/ws/output?meeting=${meeting}&token=${token}`);
+        ws.binaryType = "arraybuffer";
+        ws.onmessage = (ev) => {
+          if (!(ev.data instanceof ArrayBuffer)) return;
+          // PCM16 → Float32
+          const pcm = new Int16Array(ev.data);
+          const f32 = new Float32Array(pcm.length);
+          for (let i = 0; i < pcm.length; i++) f32[i] = pcm[i] / 32768;
+          node.port.postMessage(f32.buffer, [f32.buffer]);
+        };
+        // gateway 側の切断（Cloud Run 60分など）に備えて常に繋ぎ直す
+        ws.onclose = () => setTimeout(connect, 1000);
+        ws.onerror = () => ws.close();
+      }
+      connect();
+    }
+
+    // ボットの Chromium は自動再生が許可されているが、念のためリトライも仕込む
+    start().catch(() => {
+      const retry = () => start().catch(console.error);
+      document.addEventListener("click", retry, { once: true });
+      setTimeout(retry, 2000);
+    });
+  </script>
+</body>
+</html>
