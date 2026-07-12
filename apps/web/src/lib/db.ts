@@ -32,18 +32,19 @@ export interface AgentRow {
   language: string;
   engine: "gemini" | "openai";
   voice: string | null;
+  announce_on_join: boolean;
 }
 
 export async function getOrCreateAgent(userId: string): Promise<AgentRow> {
   const found = await pool.query<AgentRow>(
-    `select id, name, wake_word, system_prompt, language, engine, voice
+    `select id, name, wake_word, system_prompt, language, engine, voice, announce_on_join
        from agents where user_id = $1 order by created_at limit 1`,
     [userId],
   );
   if (found.rows.length > 0) return found.rows[0];
   const created = await pool.query<AgentRow>(
     `insert into agents (user_id) values ($1)
-     returning id, name, wake_word, system_prompt, language, engine, voice`,
+     returning id, name, wake_word, system_prompt, language, engine, voice, announce_on_join`,
     [userId],
   );
   return created.rows[0];
@@ -51,12 +52,18 @@ export async function getOrCreateAgent(userId: string): Promise<AgentRow> {
 
 export async function updateAgent(
   userId: string,
-  agent: { name: string; systemPrompt: string; engine: string },
+  agent: { name: string; systemPrompt: string; engine: string; announceOnJoin: boolean },
 ): Promise<void> {
   await pool.query(
-    `update agents set name = $2, wake_word = $2, system_prompt = $3, engine = $4
+    `update agents set name = $2, wake_word = $2, system_prompt = $3, engine = $4, announce_on_join = $5
       where user_id = $1`,
-    [userId, agent.name, agent.systemPrompt, agent.engine === "openai" ? "openai" : "gemini"],
+    [
+      userId,
+      agent.name,
+      agent.systemPrompt,
+      agent.engine === "openai" ? "openai" : "gemini",
+      agent.announceOnJoin,
+    ],
   );
 }
 

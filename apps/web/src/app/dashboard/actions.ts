@@ -19,6 +19,7 @@ export async function saveAgentAction(formData: FormData): Promise<void> {
     name: String(formData.get("name") ?? "リコールさん").trim(),
     systemPrompt: String(formData.get("systemPrompt") ?? "").trim(),
     engine: String(formData.get("engine") ?? "gemini"),
+    announceOnJoin: formData.get("announceOnJoin") === "on",
   });
   redirect("/dashboard");
 }

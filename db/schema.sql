@@ -20,6 +20,8 @@ create table if not exists agents (
   language      text not null default 'ja',
   engine        text not null default 'gemini' check (engine in ('gemini', 'openai')),
   voice         text,
+  -- 入室時に「録音中です」と一言アナウンスする（同意取得・コンプライアンス用）
+  announce_on_join boolean not null default true,
   created_at    timestamptz not null default now()
 );
 

@@ -87,6 +87,10 @@ export default async function Dashboard() {
               <option value="openai">OpenAI Realtime（要 API キー設定）</option>
             </select>
           </label>
+          <label style={{ display: "block", marginBottom: 12 }}>
+            <input type="checkbox" name="announceOnJoin" defaultChecked={agent.announce_on_join} />
+            {" "}入室時に録音アナウンスを一言喋る（「この会議は録音・文字起こしされています」）
+          </label>
           <div>
             <button type="submit" style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid #ccd", background: "#fff", cursor: "pointer" }}>
               保存

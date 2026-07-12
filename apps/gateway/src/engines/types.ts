@@ -21,6 +21,8 @@ export interface VoiceEngine {
   connect(opts: VoiceEngineOptions, cb: VoiceEngineCallbacks): Promise<void>;
   /** 会議の音声を流し込む（PCM16、config.inputSampleRate） */
   sendAudio(pcm: Buffer): void;
+  /** システムからの指示テキストを1ターンとして送る（入室アナウンス等に使用） */
+  sendText(text: string): void;
   /** エージェントの発話を中断する（介入操作用） */
   interrupt(): void;
   close(): Promise<void>;

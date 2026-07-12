@@ -43,6 +43,8 @@ export interface AgentProfile {
   language: string;
   engine: "gemini" | "openai";
   voice?: string;
+  /** 入室時に録音中である旨をアナウンスする（既定 ON） */
+  announceOnJoin: boolean;
 }
 
 interface DashboardEvent {
@@ -68,6 +70,9 @@ export class MeetingSession {
 
   /** ウェイクワード制御: 呼ばれてから応答1ターンぶんだけ音声を外へ出す */
   private responseWindowOpen = false;
+
+  /** 入室アナウンスは1セッション1回だけ（再接続時に繰り返さない） */
+  private announced = false;
 
   constructor(meetingId: string, private agent: AgentProfile) {
     this.meetingId = meetingId;
@@ -126,6 +131,17 @@ export class MeetingSession {
 
   attachOutput(ws: WebSocket): void {
     this.attach(this.outputSockets, ws);
+    // Output Media ページが繋がった = ボットが会議に入って音を出せる状態。
+    // オプションが ON なら録音中アナウンスを自分の声で一言喋る。
+    if (this.agent.announceOnJoin && !this.announced && this.engine) {
+      this.announced = true;
+      this.responseWindowOpen = true;
+      this.engine.sendText(
+        `（システム連絡: あなたはいま会議に入室しました。参加者に向けて` +
+          `「こんにちは、AIアシスタントの${this.agent.name}です。この会議の内容は録音・文字起こしされています。` +
+          `${this.agent.wakeWord}、と呼んでいただければ応答します」という趣旨を、自然な一言で挨拶してください）`,
+      );
+    }
   }
 
   attachDashboard(ws: WebSocket): void {

@@ -10,6 +10,7 @@ const fallbackProfile: AgentProfile = {
   systemPrompt: "あなたは会議アシスタントです。名前を呼ばれたときだけ、簡潔な日本語で答えてください。",
   language: "ja",
   engine: "gemini",
+  announceOnJoin: true,
 };
 
 /** 文字起こしを永続化する（会議終了後の議事録生成に使う）。DB 未設定時は何もしない */
@@ -34,7 +35,7 @@ export async function persistTranscriptSegment(
 export async function getAgentForMeeting(meetingId: string): Promise<AgentProfile> {
   if (!pool) return fallbackProfile;
   const { rows } = await pool.query(
-    `select a.name, a.wake_word, a.system_prompt, a.language, a.engine, a.voice
+    `select a.name, a.wake_word, a.system_prompt, a.language, a.engine, a.voice, a.announce_on_join
        from meetings m join agents a on a.id = m.agent_id
       where m.id = $1`,
     [meetingId],
@@ -48,5 +49,6 @@ export async function getAgentForMeeting(meetingId: string): Promise<AgentProfil
     language: r.language,
     engine: r.engine === "openai" ? "openai" : "gemini",
     voice: r.voice ?? undefined,
+    announceOnJoin: r.announce_on_join !== false,
   };
 }

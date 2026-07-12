@@ -12,6 +12,7 @@ export class GeminiLiveEngine implements VoiceEngine {
   // SDK の Session 型に依存しすぎないよう最小限のシグネチャで保持する
   private session: {
     sendRealtimeInput: (input: unknown) => void;
+    sendClientContent: (input: unknown) => void;
     close: () => void;
   } | null = null;
   private closed = false;
@@ -42,7 +43,11 @@ export class GeminiLiveEngine implements VoiceEngine {
           if (!this.closed) cb.onError(new Error("gemini live session closed unexpectedly"));
         },
       },
-    })) as unknown as { sendRealtimeInput: (input: unknown) => void; close: () => void };
+    })) as unknown as {
+      sendRealtimeInput: (input: unknown) => void;
+      sendClientContent: (input: unknown) => void;
+      close: () => void;
+    };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,6 +79,13 @@ export class GeminiLiveEngine implements VoiceEngine {
         data: pcm.toString("base64"),
         mimeType: `audio/pcm;rate=${config.inputSampleRate}`,
       },
+    });
+  }
+
+  sendText(text: string): void {
+    this.session?.sendClientContent({
+      turns: [{ role: "user", parts: [{ text }] }],
+      turnComplete: true,
     });
   }
 

@@ -11,6 +11,7 @@ export class OpenAIRealtimeEngine implements VoiceEngine {
     throw new Error("OpenAI Realtime adapter は未実装です（engines/openai.ts）。engine=gemini を使ってください。");
   }
   sendAudio(_pcm: Buffer): void {}
+  sendText(_text: string): void {}
   interrupt(): void {}
   async close(): Promise<void> {}
 }
